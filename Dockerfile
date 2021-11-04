@@ -1,24 +1,22 @@
 FROM golang:alpine as build
 
-ENV GOOS=linux \
-    GOARCH=amd64 
-
-RUN apk add --no-cache git
+RUN echo -e "http://nl.alpinelinux.org/alpine/v3.14/main\nhttp://nl.alpinelinux.org/alpine/v3.14/community" > /etc/apk/repositories \
+  apk add --no-cache \
+  git \
+  ca-certificates
 
 WORKDIR /go/src/transmission-telegram
+
 COPY . .
 
-RUN go get -d -v ./...
-RUN go install -v ./...
-
-RUN go build -o main .
-
-FROM alpine:latest as certs
-RUN apk --update add ca-certificates
+RUN go mod init &&\
+  go get -d -v ./... &&\
+  go install -v ./... &&\
+  go build -o main .
 
 FROM bash:latest
-COPY --from=certs /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=build /go/bin/transmission-telegram /
-RUN chmod 777 transmission-telegram
+RUN chmod 755 transmission-telegram
 
 ENTRYPOINT ["/transmission-telegram"]
